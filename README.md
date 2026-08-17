@@ -16,6 +16,12 @@ Amadeus 将 SeeThrough 论文补充数据中的候选物，经可配置数值规
 
 当前 SeeThrough 水相候选演示计算链为 **1619 → 1373 → 1297 → 225 → 41 → 20**；自动规则获得 20 个候选，论文最终 10 个候选在自动候选中恢复 **10/10**。
 
+## 筛选结果图
+
+![SeeThrough 候选试剂自动筛选数量变化](数据/导出结果/图表/候选试剂筛选数量变化图.png)
+
+![自动筛选候选的物化参数分布](数据/导出结果/图表/最终候选物化参数分布图.png)
+
 ## Demo 1.0 与 2.0 对比
 
 与 [SeeThrough 参考演示 1.0](https://github.com/sakana-enthusiasts/automatic-screening-framework_SeeThrough_demo_1.0) 使用同一套论文数据和筛选链；下表同时列出目前各模块的接入状态与验证情况。
