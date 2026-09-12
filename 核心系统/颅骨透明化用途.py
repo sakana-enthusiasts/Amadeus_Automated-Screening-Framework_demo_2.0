@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 from typing import Any
+import json
 
 import pandas as pd
 
 from 核心系统.数据管理接口 import 文件数据访问管理器
 from 插件.化学计算.确认批次描述符插件 import 确认批次描述符插件
-from 插件.颅骨透明化.颅骨透明化用途插件 import 默认用途配置, 颅骨透明化用途运行器, 用途标识
+from 插件.颅骨透明化.颅骨透明化用途插件 import 默认用途配置, 用途标识
+from 核心系统.配方评估流程 import 运行颅骨透明化流程
 
 
 成分证据标识 = "颅骨透明化成分证据.csv"
@@ -20,6 +22,8 @@ HSP结果标识 = "颅骨透明化HSP结果.csv"
 配方特征标识 = "颅骨透明化配方特征.csv"
 描述符标识 = "确认批次化学描述符.csv"
 组分HSP结果标识 = "颅骨透明化组分HSP结果.csv"
+配方物性标识 = "颅骨透明化配方物性.csv"
+用途约束标识 = "颅骨透明化用途约束.csv"
 
 
 def _读取(管理器: 文件数据访问管理器, 标识: str) -> pd.DataFrame:
@@ -45,6 +49,8 @@ def 默认成分证据(确认清单: pd.DataFrame) -> pd.DataFrame:
         "VA中溶解度": pd.NA, "AqIS中溶解度": pd.NA, "预测混溶性": "", "实验混溶性": "",
         "沉淀": "", "浑浊": "", "分层": "", "分层时间": "", "颜色": "", "颜色变化": "",
         "吸收峰_nm": pd.NA, "pH": pd.NA, "脱钙证据": "", "脱脂证据": "", "胶原处理证据": "", "数据来源": "",
+        "体积分数": pd.NA, "摩尔分数": pd.NA, "纯物质黏度_mPa_s": pd.NA,
+        "渗透角色": "", "摩尔浓度_mol_L": pd.NA, "范特霍夫因子": pd.NA,
     }
     for 字段, 默认值 in 字段默认值.items():
         if 字段 not in 成分:
@@ -97,6 +103,9 @@ def 读取配方设置(管理器: 文件数据访问管理器, 批次编号: str
 
 def 保存配方设置(管理器: 文件数据访问管理器, 批次编号: str, 设置: dict[str, Any]) -> dict[str, Any]:
     新设置 = {"批次编号": str(批次编号), **设置}
+    for 字段 in ("物性模型选择", "物性模型参数", "物性条件"):
+        if isinstance(新设置.get(字段), dict):
+            新设置[字段] = json.dumps(新设置[字段], ensure_ascii=False, allow_nan=False)
     全部 = _读取(管理器, 配方设置标识)
     保留 = 全部.loc[~全部.get("批次编号", pd.Series(dtype=str)).astype(str).eq(str(批次编号))] if not 全部.empty else pd.DataFrame()
     管理器.保存软件数据库表格(配方设置标识, pd.concat([保留, pd.DataFrame([新设置])], ignore_index=True) if not 保留.empty else pd.DataFrame([新设置]))
@@ -165,15 +174,21 @@ def 运行用途评估(管理器: 文件数据访问管理器, 批次编号: str
     配置 = 默认用途配置() | dict(用途配置 or {})
     if 配置.get("用途标识") != 用途标识:
         raise ValueError("仅可运行颅骨透明化用途评估")
-    结果 = 颅骨透明化用途运行器().运行(
-        读取成分证据(管理器, 批次编号, 确认清单), 配置,
-        读取HSP参照(管理器, 批次编号), 读取配方设置(管理器, 批次编号), 读取实验记录(管理器, 批次编号),
-    )
+    结果 = 运行颅骨透明化流程({
+        "成分": 读取成分证据(管理器, 批次编号, 确认清单), "用途配置": 配置,
+        "HSP参照": 读取HSP参照(管理器, 批次编号), "配方设置": 读取配方设置(管理器, 批次编号),
+        "实验记录": 读取实验记录(管理器, 批次编号), "配方编号": str(批次编号),
+    })
     描述符 = 读取确认批次描述符(管理器, 批次编号)
     聚合描述符 = _描述符配方聚合(pd.DataFrame(结果["成分评估"]), 描述符)
     结果["配方特征"] = pd.concat([pd.DataFrame(结果["配方特征"]).reset_index(drop=True), 聚合描述符.reset_index(drop=True)], axis=1)
     for 标识, 数据 in ((评估结果标识, 结果["配方摘要"]), (HSP结果标识, 结果["HSP结果"]), (组分HSP结果标识, 结果["组分HSP结果"]), (配方特征标识, 结果["配方特征"])):
         _按批次保存(管理器, 标识, 批次编号, pd.DataFrame(数据))
+    物性表 = 结果["配方物性"].copy()
+    for 列 in ("警告", "依赖", "条件", "模型参数"):
+        物性表[列] = 物性表[列].map(lambda 值: json.dumps(值, ensure_ascii=False, allow_nan=False))
+    _按批次保存(管理器, 配方物性标识, 批次编号, 物性表)
+    _按批次保存(管理器, 用途约束标识, 批次编号, 结果["用途约束"])
     return 结果
 
 
