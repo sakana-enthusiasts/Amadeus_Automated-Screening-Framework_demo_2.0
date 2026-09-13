@@ -42,13 +42,14 @@ def 创建默认模型注册表() -> 模型注册表:
     from .折射率.Lorentz_Lorenz import LorentzLorenz模型
     from .黏度.Grunberg_Nissan import GrunbergNissan模型
     from .黏度.理想对数混合 import 理想对数混合模型
+    from .黏度.Cheng_2008 import Cheng甘油水模型
     from .扩散.Stokes_Einstein import StokesEinstein模型
     from .渗透.理想渗透压 import 理想渗透压模型
     from .渗透.非理想活度模型 import 渗透系数修正模型
     from .水活度.水活度模型 import 理想水活度模型, 活度系数水活度模型
 
     注册表 = 模型注册表()
-    for 模型类 in (LorentzLorenz模型, GrunbergNissan模型, 理想对数混合模型, StokesEinstein模型,
+    for 模型类 in (LorentzLorenz模型, GrunbergNissan模型, 理想对数混合模型, Cheng甘油水模型, StokesEinstein模型,
                    理想渗透压模型, 渗透系数修正模型, 理想水活度模型, 活度系数水活度模型):
         注册表.注册(模型类())
     return 注册表
